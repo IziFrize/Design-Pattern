@@ -1,7 +1,7 @@
 # L3 design pattern report
 
-- **Firstname**: [Your firstname]
-- **Lastname**: [Your lastname]
+- **Firstname**: SACHA
+- **Lastname**: TOURTELIER
 
 
 > Add your thoughts on every TP bellow, everything is interresting but no need to right a book.
@@ -22,4 +22,12 @@
 > Fill free to contact me if needed.
 
 ---
-...
+-28/01/2024
+
+**Ce que j'ai fait** :
+- Application principe de Single Responsability Principle 
+
+  |-> Division de l'application en 4 parties
+
+**Ce qui m'a aidé** :
+- Les erreurs de l'IDE

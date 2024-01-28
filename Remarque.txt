@@ -1,0 +1,4 @@
+23/01/2024
+Problème argument gère un a un pose problème si on veux rajouter 50 arguments
+Classe pour gerer erreurs
+
