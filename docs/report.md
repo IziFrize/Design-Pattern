@@ -31,3 +31,9 @@
 
 **Ce qui m'a aidé** :
 - Les erreurs de l'IDE
+
+coriger test
+
+insert -s outpout.json test
+
+list -s output.json --done

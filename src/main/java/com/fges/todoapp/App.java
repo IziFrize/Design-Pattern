@@ -3,7 +3,6 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.ParseException;
 import java.io.IOException;
 
-
 public class App {
     public static void main(String[] args) throws Exception {
         System.exit(exec(args));
@@ -27,27 +26,24 @@ public class App {
             String command = positionalArgs.get(0);
             String fileContent = fileProcessor.readFile(fileName);
             String fileType = fileName.endsWith(".json") ? "json" : "csv";
+            boolean isDone = cmd.hasOption("d");
 
-            if (command.equals("insert")) {
+            if ("insert".equals(command)) {
                 if (positionalArgs.size() < 2) {
                     System.err.println("Missing TODO name");
                     return 1;
                 }
                 String todo = positionalArgs.get(1);
-                String updatedContent = todoManager.insertTodo(fileContent, todo, fileType);
+                String updatedContent = todoManager.insertTodo(fileContent, todo, isDone, fileType);
                 fileProcessor.writeFile(fileName, updatedContent);
-            } else if (command.equals("list")) {
-                System.out.println(todoManager.listTodos(fileContent, fileType));
+            } else if ("list".equals(command)) {
+                System.out.println(todoManager.listTodos(fileContent, isDone, fileType));
             }
-        } catch (ParseException ex) {
-            System.err.println("Fail to parse arguments: " + ex.getMessage());
-            return 1;
-        } catch (IOException ex) {
-            System.err.println("File error: " + ex.getMessage());
+        } catch (ParseException | IOException ex) {
+            System.err.println("Error: " + ex.getMessage());
             return 1;
         }
 
-        System.err.println("Done.");
         return 0;
     }
 }

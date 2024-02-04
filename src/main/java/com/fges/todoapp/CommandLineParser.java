@@ -11,6 +11,7 @@ public class CommandLineParser {
     public CommandLineParser() {
         options = new Options();
         options.addRequiredOption("s", "source", true, "File containing the todos");
+        options.addOption("d", "done", false, "Mark todo as done");
     }
 
     public CommandLine parse(String[] args) throws ParseException {
