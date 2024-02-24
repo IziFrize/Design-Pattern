@@ -1,5 +1,7 @@
 .vscode
 .idea
+.json
+.csv
 
 target
 

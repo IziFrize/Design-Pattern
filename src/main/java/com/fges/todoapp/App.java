@@ -1,49 +1,50 @@
 package com.fges.todoapp;
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.ParseException;
-import java.io.IOException;
+
+
+import com.fges.todoapp.commands.Command;
+import com.fges.todoapp.factories.CommandFactory;
+import com.fges.todoapp.factories.ToDoManagerFactory;
+import com.fges.todoapp.managers.ToDoManager;
+import org.apache.commons.cli.*;
+
+import java.nio.file.Paths;
 
 public class App {
     public static void main(String[] args) throws Exception {
         System.exit(exec(args));
     }
 
-    public static int exec(String[] args) {
-        CommandLineParser commandLineParser = new CommandLineParser();
-        FileProcessor fileProcessor = new FileProcessor();
-        TodoManager todoManager = new TodoManager();
+    public static int exec(String[] args) throws Exception {
+        Options cliOptions = new Options();
+        CommandLineParser parser = new DefaultParser();
+        cliOptions.addRequiredOption("s", "source", true, "File containing the todos");
 
+        CommandLine cmd;
         try {
-            CommandLine cmd = commandLineParser.parse(args);
-
-            String fileName = cmd.getOptionValue("s");
-            java.util.List<String> positionalArgs = cmd.getArgList();
-            if (positionalArgs.isEmpty()) {
-                System.err.println("Missing Command");
-                return 1;
-            }
-
-            String command = positionalArgs.get(0);
-            String fileContent = fileProcessor.readFile(fileName);
-            String fileType = fileName.endsWith(".json") ? "json" : "csv";
-            boolean isDone = cmd.hasOption("d");
-
-            if ("insert".equals(command)) {
-                if (positionalArgs.size() < 2) {
-                    System.err.println("Missing TODO name");
-                    return 1;
-                }
-                String todo = positionalArgs.get(1);
-                String updatedContent = todoManager.insertTodo(fileContent, todo, isDone, fileType);
-                fileProcessor.writeFile(fileName, updatedContent);
-            } else if ("list".equals(command)) {
-                System.out.println(todoManager.listTodos(fileContent, isDone, fileType));
-            }
-        } catch (ParseException | IOException ex) {
-            System.err.println("Error: " + ex.getMessage());
+            cmd = parser.parse(cliOptions, args);
+        } catch (ParseException ex) {
+            System.err.println("Fail to parse arguments: " + ex.getMessage());
             return 1;
         }
 
-        return 0;
+        String fileName = cmd.getOptionValue("s");
+        String[] positionalArgs = cmd.getArgList().toArray(new String[0]);
+        if (positionalArgs.length < 1) {
+            System.err.println("Missing Command");
+            return 1;
+        }
+
+        String commandType = positionalArgs[0];
+        ToDoManager manager = ToDoManagerFactory.getManager(Paths.get(fileName));
+        Command command = CommandFactory.getCommand(commandType, manager, positionalArgs);
+
+        try {
+            command.execute();
+            System.err.println("Done.");
+            return 0;
+        } catch (Exception e) {
+            System.err.println("Error executing command: " + e.getMessage());
+            return 1;
+        }
     }
 }
