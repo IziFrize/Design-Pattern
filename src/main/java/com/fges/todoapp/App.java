@@ -1,260 +1,190 @@
-package com.fges.todoapp;
-
+package com.fges.todoapp.e2e;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.commons.cli.*;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
 
-public class App {
+@RunWith(Parameterized.class)
+public class GhostTests {
 
-    public static void main(String[] args) throws Exception {
-        System.exit(exec(args));
+    /**
+     * Version of the TP to use with the API, refer to the TP name on the slides!!
+     */
+    private static final String TP_NAME = "tp3";
+
+    /**
+     * DO NOT CHANGE FROM THIS LINE TO THE END OF THE FILE
+     */
+
+
+    private static final String API_ENDPOINT = "https://testcase-api.jho.ovh";
+    private static final String EXEC_CLASS = "com.fges.todoapp.App";
+    private static final String EXEC_METHOD_NAME = "exec";
+
+
+    /**
+     * Represents a sequence of command execution and their results.
+     * Stdout is used to compare results, that's why the
+     *
+     * @param sequence    List of arguments of the commands to execute. Example:<br>
+     *                    {"insert", "-s", "source.json", "Hello World"},<br>
+     *                    {"insert", "-s", "source.json", "Bye"},<br>
+     *                    {"list", "-s", "source.json"},
+     * @param stdoutLines List of lines in the stdout
+     * @param exitCode    Exit code of the program
+     * @param name        Details about what is tested
+     */
+    public record ExecOutput(List<List<String>> sequence, List<String> stdoutLines, int exitCode, String name) {
+
+        @Override
+        public String toString() {
+            if (name != null) {
+                return name;
+            }
+            return "Format=" + sequence.get(0).stream().filter(arg -> arg.startsWith("tmp-")).findFirst().orElse("file.unknown").split("\\.")[1] +
+                    ", Todo count=" + (sequence.size() - 1) +
+                    ", exitCode=" + exitCode;
+        }
     }
 
-    public static int exec(String[] args) throws IOException {
-        Options cliOptions = new Options();
-        CommandLineParser parser = new DefaultParser();
+    /**
+     * Fetch the data used for the tests
+     * @return a list of ExecOutput that will be taken as test cases.
+     * @throws Exception if the API call is missing or the exec() method does not exist
+     */
+    @Parameterized.Parameters(name = "{index}: {0}")
+    public static List<Object[]> data() throws Exception {
 
-        cliOptions.addRequiredOption("s", "source", true, "File containing the todos");
-        cliOptions.addOption("d", "done", false, "Si présent, la tâche est finie");
-        cliOptions.addOption("o", "output", true, "Output file for migrate command");
-
-
-        CommandLine cmd;
         try {
-            cmd = parser.parse(cliOptions, args);
-        } catch (ParseException ex) {
-            System.err.println("Fail to parse arguments: " + ex.getMessage());
-            return 1; // Return 1 if there is a failure in parsing arguments.
+            Class.forName(EXEC_CLASS).getMethod(EXEC_METHOD_NAME, String[].class);
+        } catch (ReflectiveOperationException e) {
+            throw new Exception("exec() method is not available");
         }
 
-        String fileName = cmd.getOptionValue("s");
-        String doneStatus = cmd.hasOption("d") ? cmd.getOptionValue("d", "true") : "false"; // If --done is specified, default to true
-        String outputFileName = cmd.getOptionValue("o", "");
+        var output = getApiExecOutput(TP_NAME);
 
-        List<String> positionalArgs = cmd.getArgList();
-        if (positionalArgs.isEmpty()) {
-            System.err.println("Missing Command");
-            return 1; // Return 1 if the command is missing.
-        }
-
-        String command = positionalArgs.get(0);
-        Path filePath = Paths.get(fileName);
-        String fileContent = Files.exists(filePath) ? Files.readString(filePath) : "";
-
-        try {
-            switch (command) {
-                case "insert":
-                    insertTodo(positionalArgs, fileName, fileContent, doneStatus);
-                    break;
-                case "list":
-                    listTodos(fileName, fileContent, doneStatus);
-                    break;
-                case "migrate":
-                    if (!outputFileName.isEmpty()) {
-                        migrateTodos(fileName, outputFileName);
-                    } else {
-                        System.err.println("Output file not specified");
-                        return 1; // Return 1 if the output file is not specified.
-                    }
-                    break;
-                default:
-                    System.err.println("Unknown command");
-                    return 1; // Return 1 if the command is unknown.
-            }
-        } catch (Exception e) {
-            //System.err.println("An error occurred: " + e.getMessage());
-            return 1; // Return 1 if an error occurs during command execution.
-        }
-
-        //System.err.println("Done.");
-        return 0; // Return 0 if everything worked correctly.
-    }
-
-    private static void migrateTodos(String sourceFileName, String outputFileName) throws IOException {
-        Path sourcePath = Paths.get(sourceFileName);
-        Path outputPath = Paths.get(outputFileName);
-
-        // Lire le contenu du fichier source
-        String sourceContent = Files.readString(sourcePath);
-        ObjectMapper mapper = new ObjectMapper();
-
-        // Migration de CSV vers JSON
-        if (sourceFileName.endsWith(".csv") && outputFileName.endsWith(".json")) {
-            List<Map<String, String>> todos = new ArrayList<>();
-            if (Files.exists(outputPath)) {
-                // Lire et ajouter les todos existants au début de la liste
-                String existingContent = Files.readString(outputPath);
-                if (!existingContent.isEmpty()) {
-                    todos.addAll(mapper.readValue(existingContent, new TypeReference<List<Map<String, String>>>() {}));
-                }
-            }
-
-            String[] lines = sourceContent.split("\n");
-            for (String line : lines) {
-                String[] parts = line.split(",,,,", -1);
-                Map<String, String> todo = new HashMap<>();
-                todo.put("task", parts[0]);
-                todo.put("done", parts.length > 1 ? parts[1] : "false");
-                todos.add(todo);
-            }
-
-            Files.writeString(outputPath, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(todos));
-        }
-        // Migration de JSON vers CSV
-        else if (sourceFileName.endsWith(".json") && outputFileName.endsWith(".csv")) {
-            StringBuilder csvBuilder = new StringBuilder();
-            if (Files.exists(outputPath)) {
-                csvBuilder.append(Files.readString(outputPath));
-            }
-
-            JsonNode jsonNode = mapper.readTree(sourceContent);
-            if (jsonNode.isArray()) {
-                for (JsonNode node : jsonNode) {
-
-                    String task = node.path("task").asText("");
-                    String done = node.path("done").asText("false");
-                    csvBuilder.append("\n").append(task).append(",,,,").append(done).append("\n");
-                }
-            }
-
-            Files.writeString(outputPath, csvBuilder.toString());
-        }
-        // Migration de JSON vers JSON, en s'assurant de fusionner correctement les tableaux JSON
-        else if (sourceFileName.endsWith(".json") && outputFileName.endsWith(".json")) {
-            ArrayNode existingTodos = mapper.createArrayNode();
-            if (Files.exists(outputPath) && !Files.readString(outputPath).isEmpty()) {
-                existingTodos = (ArrayNode) mapper.readTree(Files.readString(outputPath));
-            }
-            ArrayNode sourceTodos = (ArrayNode) mapper.readTree(sourceContent);
-
-            // Fusionner les tableaux JSON
-            existingTodos.addAll(sourceTodos);
-            Files.writeString(outputPath, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(existingTodos));
-        }
-        // Migration de CSV vers CSV, concaténant simplement le contenu
-        else if (sourceFileName.endsWith(".csv") && outputFileName.endsWith(".csv")) {
-            String existingContent = Files.exists(outputPath) ? Files.readString(outputPath) : "";
-            // Initialiser combinedContent avec le contenu existant
-            StringBuilder combinedContent = new StringBuilder(existingContent);
-
-            // Vérifier si le contenu existant n'est pas vide et ne se termine pas par un saut de ligne,
-            // et que le contenu source n'est pas vide également avant d'ajouter un saut de ligne
-            if (!existingContent.isEmpty() && !existingContent.endsWith("\n") && !sourceContent.isEmpty()) {
-                combinedContent.append("\n"); // Ajoutez un saut de ligne avant d'ajouter le contenu source
-            }
-
-            // Ajouter le contenu source au contenu combiné
-            combinedContent.append(sourceContent);
-
-            // Écrire le contenu combiné dans le fichier de destination
-            Files.writeString(outputPath, combinedContent.toString());
-        }
-        else {
-            System.err.println("La migration entre des formats différents n'est pas supportée.");
-        }
+        return output.stream().map(
+                o -> new Object[]{o}
+        ).toList();
     }
 
 
+    // Execution output used for the test
+    private final ExecOutput execOutput;
 
+    public GhostTests(ExecOutput execOutput) {
+        this.execOutput = execOutput;
+    }
 
-    private static void insertTodo(List<String> positionalArgs, String fileName,
-                                   String fileContent, String doneStatus) throws IOException {
-        String todo = positionalArgs.get(1).trim();
-        Path filePath = Paths.get(fileName);
+    /**
+     * The test
+     *
+     * @throws Exception Any exception, it's ok to not handle them in tests because
+     */
+    @Test
+    public void ghostTest() throws Exception {
+        var testOutput = runMain(this.execOutput.sequence);
+        Assert.assertEquals("Exit code should be the same", this.execOutput.exitCode, testOutput.exitCode);
+        assertStdoutEquals(this.execOutput.stdoutLines, testOutput.stdoutLines);
+    }
 
-        // Déterminer le statut basé sur la présence de l'option --done
-        // Ici, doneStatus est "true" si --done est présent, sinon "false".
-        // Aucune modification n'est nécessaire si vous utilisez déjà cette logique.
+    private static void assertStdoutEquals(List<String> expected, List<String> actual) {
+        var expectedAsArray = formatStdoutLines(expected).toArray();
+        var actualAsArray = formatStdoutLines(actual).toArray();
 
-        if (!Files.exists(filePath)) {
-            Files.createFile(filePath); // Crée le fichier vide
+        System.err.println(Arrays.toString(expectedAsArray));
+        System.err.println(Arrays.toString(actualAsArray));
+
+        Assert.assertEquals("Length should be the same", expectedAsArray.length, actualAsArray.length);
+
+        for (int i = 0; i < expectedAsArray.length; i++) {
+            Assert.assertEquals("Line should be the same", expectedAsArray[0], actualAsArray[0]);
         }
 
-        if (fileName.endsWith(".json")) {
+    }
+
+    private static List<String> formatStdoutLines(List<String> baseLines) {
+        return baseLines.stream()
+                .map(line -> line.trim().replace("\"", ""))
+                .filter(line -> !line.isEmpty())
+                .toList();
+    }
+
+    private ExecOutput runMain(List<List<String>> sequence) throws Exception {
+        var out = System.out;
+        ByteArrayOutputStream sout = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(sout));
+
+        int exitOutput = 0;
+
+        for (var args : sequence) {
+            var execMethod = Class.forName(EXEC_CLASS).getMethod(EXEC_METHOD_NAME, String[].class);
+
+            exitOutput = (int) execMethod.invoke(null, (Object) args.toArray(new String[0]));
+        }
+
+        System.setOut(out);
+
+        return new ExecOutput(
+                sequence,
+                Arrays.stream(sout.toString().split("\n")).map(String::trim).toList(),
+                exitOutput,
+                "unknown"
+        );
+    }
+
+    private static List<ExecOutput> getApiExecOutput(String tpName) throws IOException {
+        URL url = new URL(API_ENDPOINT + "/tp?tpName=" + tpName);
+        HttpURLConnection con = (HttpURLConnection) url.openConnection();
+        con.setRequestMethod("GET");
+
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8))) {
+            StringBuilder response = new StringBuilder();
+            String responseLine;
+            while ((responseLine = br.readLine()) != null) {
+                response.append(responseLine.trim());
+            }
+
             ObjectMapper mapper = new ObjectMapper();
-            ArrayNode arrayNode = fileContent.isEmpty() ? mapper.createArrayNode() : (ArrayNode) mapper.readTree(fileContent);
 
-            ObjectNode todoNode = mapper.createObjectNode();
-            todoNode.put("task", todo);
-            todoNode.put("done", doneStatus);
-            arrayNode.add(todoNode);
-            Files.writeString(filePath, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(arrayNode));
-        } else if (fileName.endsWith(".csv")) {
-            String newLine = todo + ",,,," + doneStatus; // Utilisez le séparateur et ajoutez la tâche avec le statut défini
-            fileContent += fileContent.isEmpty() ? "" : "\n";
-            fileContent += newLine;
-            Files.writeString(filePath, fileContent);
+            return mapper.readValue(response.toString(), new TypeReference<>() {
+            });
         }
     }
 
+    /**
+     * Remove if you want to keep temporary test files
+     */
+    @After
+    public void after() {
+        deleteTmpFiles();
+    }
 
-
-
-
-    private static void listTodos(String fileName, String fileContent, String doneStatus) throws IOException {
-        boolean filterDoneOnly = "true".equals(doneStatus);
-
-        if (fileName.endsWith(".json")) {
-            ObjectMapper mapper = new ObjectMapper();
-            ArrayNode arrayNode = mapper.readValue(fileContent.isEmpty() ? "[]" : fileContent, ArrayNode.class);
-            for (JsonNode node : arrayNode) {
-                String task = node.get("task").asText();
-                String status = node.has("done") ? node.get("done").asText() : "";
-
-                // Aucune condition de filtrage pour 'false', il doit toujours être affiché
-                if (!filterDoneOnly || status.equals("true")) {
-                    if (status.equals("true")) {
-                        System.out.println("- Done: " + task);
-                    } else if (status.equals("false")) {
-                        // Afficher la tâche sans préfixe pour le statut 'false'
-                        System.out.println("- " + task);
-                    } else if (!status.isEmpty()) {
-                        // Afficher le statut spécifique s'il n'est pas vide et différent de 'false'
-                        System.out.println("- " + status + ": " + task);
-                    } else {
-                        // Afficher juste la tâche si le statut est vide
-                        System.out.println("- " + task);
-                    }
-                }
+    /**
+     * The API gives sequences of code that uses the
+     */
+    private void deleteTmpFiles() {
+        File directory = Paths.get(System.getProperty("user.dir")).toFile();
+        var files = directory.listFiles();
+        if (files == null) {
+            System.err.println("Null directory");
+            return;
+        }
+        for (File f : files) {
+            if (f.getName().startsWith("tmp-")) {
+                f.delete();
             }
-        } else if (fileName.endsWith(".csv")) {
-            Arrays.stream(fileContent.split("\n"))
-                    .forEach(line -> {
-                        String[] parts = line.split(",,,,", -1);
-                        String task = parts[0];
-                        String status = parts.length > 1 ? parts[1] : "";
-
-                        // Aucune condition de filtrage pour 'false', il doit toujours être affiché
-                        if (!filterDoneOnly || status.equals("true")) {
-                            if (status.equals("true")) {
-                                System.out.println("- Done: " + task);
-                            } else if (status.equals("false")) {
-                                // S'assurer que la tâche n'est pas vide avant d'afficher
-                                if (!task.isEmpty()) {
-                                    System.out.println("- " + task);
-                                }
-                            } else if (!status.isEmpty()) {
-                                // S'assurer que la tâche n'est pas vide avant d'afficher
-                                if (!task.isEmpty()) {
-                                    System.out.println("- " + status + ": " + task);
-                                }
-                            } else {
-                                // Si le statut est vide, vérifiez également si la tâche n'est pas vide avant d'afficher
-                                if (!task.isEmpty()) {
-                                    System.out.println("- " + task);
-                                } // Suppression du dernier else et remplacement par un return vide pour ne rien faire si task est vide
-                            }
-                        }
-                    });
         }
     }
 }
