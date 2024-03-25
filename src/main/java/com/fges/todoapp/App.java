@@ -75,7 +75,6 @@ public class App {
             return 1;
         }
 
-
         return 0;
     }
 
@@ -128,6 +127,7 @@ public class App {
 
             Files.writeString(outputPath, csvBuilder.toString());
         }
+
         else if (sourceFileName.endsWith(".json") && outputFileName.endsWith(".json")) {
             ArrayNode existingTodos = mapper.createArrayNode();
             if (Files.exists(outputPath) && !Files.readString(outputPath).isEmpty()) {
@@ -135,19 +135,24 @@ public class App {
             }
             ArrayNode sourceTodos = (ArrayNode) mapper.readTree(sourceContent);
 
+
             existingTodos.addAll(sourceTodos);
             Files.writeString(outputPath, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(existingTodos));
         }
+
         else if (sourceFileName.endsWith(".csv") && outputFileName.endsWith(".csv")) {
             String existingContent = Files.exists(outputPath) ? Files.readString(outputPath) : "";
 
             StringBuilder combinedContent = new StringBuilder(existingContent);
 
+
             if (!existingContent.isEmpty() && !existingContent.endsWith("\n") && !sourceContent.isEmpty()) {
                 combinedContent.append("\n");
             }
 
+
             combinedContent.append(sourceContent);
+
 
             Files.writeString(outputPath, combinedContent.toString());
         }
@@ -201,14 +206,18 @@ public class App {
                 String task = node.get("task").asText();
                 String status = node.has("done") ? node.get("done").asText() : "";
 
+
                 if (!filterDoneOnly || status.equals("true")) {
                     if (status.equals("true")) {
                         System.out.println("- Done: " + task);
                     } else if (status.equals("false")) {
+
                         System.out.println("- " + task);
                     } else if (!status.isEmpty()) {
+
                         System.out.println("- " + status + ": " + task);
                     } else {
+
                         System.out.println("- " + task);
                     }
                 }
@@ -220,18 +229,22 @@ public class App {
                         String task = parts[0];
                         String status = parts.length > 1 ? parts[1] : "";
 
+
                         if (!filterDoneOnly || status.equals("true")) {
                             if (status.equals("true")) {
                                 System.out.println("- Done: " + task);
                             } else if (status.equals("false")) {
+
                                 if (!task.isEmpty()) {
                                     System.out.println("- " + task);
                                 }
                             } else if (!status.isEmpty()) {
+
                                 if (!task.isEmpty()) {
                                     System.out.println("- " + status + ": " + task);
                                 }
                             } else {
+
                                 if (!task.isEmpty()) {
                                     System.out.println("- " + task);
                                 }
