@@ -1,4 +1,4 @@
-# L3 design pattern report
+# TODO LIST SANS DESIGN-PATTERN
 
 - **Firstname**: SACHA
 - **Lastname**: TOURTELIER
@@ -39,3 +39,11 @@ insert -s outpout.json test
 list -s output.json --done
 
 Faire des bridge
+
+-25/03/24
+
+128 passé
+
+- FINAL
+
+LE PROJET PASSE AVEC SUCCES LES TESTS
