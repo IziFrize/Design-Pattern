@@ -33,7 +33,7 @@ public class App {
             cmd = parser.parse(cliOptions, args);
         } catch (ParseException ex) {
             System.err.println("Fail to parse arguments: " + ex.getMessage());
-            return 1; // Return 1 if there is a failure in parsing arguments.
+            return 1;
         }
 
         String fileName = cmd.getOptionValue("s");
@@ -43,7 +43,7 @@ public class App {
         List<String> positionalArgs = cmd.getArgList();
         if (positionalArgs.isEmpty()) {
             System.err.println("Missing Command");
-            return 1; // Return 1 if the command is missing.
+            return 1;
         }
 
         String command = positionalArgs.get(0);
@@ -63,35 +63,35 @@ public class App {
                         migrateTodos(fileName, outputFileName);
                     } else {
                         System.err.println("Output file not specified");
-                        return 1; // Return 1 if the output file is not specified.
+                        return 1;
                     }
                     break;
                 default:
                     System.err.println("Unknown command");
-                    return 1; // Return 1 if the command is unknown.
+                    return 1;
             }
         } catch (Exception e) {
-            //System.err.println("An error occurred: " + e.getMessage());
-            return 1; // Return 1 if an error occurs during command execution.
+
+            return 1;
         }
 
-        //System.err.println("Done.");
-        return 0; // Return 0 if everything worked correctly.
+
+        return 0;
     }
 
     private static void migrateTodos(String sourceFileName, String outputFileName) throws IOException {
         Path sourcePath = Paths.get(sourceFileName);
         Path outputPath = Paths.get(outputFileName);
 
-        // Lire le contenu du fichier source
+
         String sourceContent = Files.readString(sourcePath);
         ObjectMapper mapper = new ObjectMapper();
 
-        // Migration de CSV vers JSON
+
         if (sourceFileName.endsWith(".csv") && outputFileName.endsWith(".json")) {
             List<Map<String, String>> todos = new ArrayList<>();
             if (Files.exists(outputPath)) {
-                // Lire et ajouter les todos existants au début de la liste
+
                 String existingContent = Files.readString(outputPath);
                 if (!existingContent.isEmpty()) {
                     todos.addAll(mapper.readValue(existingContent, new TypeReference<List<Map<String, String>>>() {}));
@@ -109,7 +109,7 @@ public class App {
 
             Files.writeString(outputPath, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(todos));
         }
-        // Migration de JSON vers CSV
+
         else if (sourceFileName.endsWith(".json") && outputFileName.endsWith(".csv")) {
             StringBuilder csvBuilder = new StringBuilder();
             if (Files.exists(outputPath)) {
@@ -128,7 +128,6 @@ public class App {
 
             Files.writeString(outputPath, csvBuilder.toString());
         }
-        // Migration de JSON vers JSON, en s'assurant de fusionner correctement les tableaux JSON
         else if (sourceFileName.endsWith(".json") && outputFileName.endsWith(".json")) {
             ArrayNode existingTodos = mapper.createArrayNode();
             if (Files.exists(outputPath) && !Files.readString(outputPath).isEmpty()) {
@@ -136,26 +135,20 @@ public class App {
             }
             ArrayNode sourceTodos = (ArrayNode) mapper.readTree(sourceContent);
 
-            // Fusionner les tableaux JSON
             existingTodos.addAll(sourceTodos);
             Files.writeString(outputPath, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(existingTodos));
         }
-        // Migration de CSV vers CSV, concaténant simplement le contenu
         else if (sourceFileName.endsWith(".csv") && outputFileName.endsWith(".csv")) {
             String existingContent = Files.exists(outputPath) ? Files.readString(outputPath) : "";
-            // Initialiser combinedContent avec le contenu existant
+
             StringBuilder combinedContent = new StringBuilder(existingContent);
 
-            // Vérifier si le contenu existant n'est pas vide et ne se termine pas par un saut de ligne,
-            // et que le contenu source n'est pas vide également avant d'ajouter un saut de ligne
             if (!existingContent.isEmpty() && !existingContent.endsWith("\n") && !sourceContent.isEmpty()) {
-                combinedContent.append("\n"); // Ajoutez un saut de ligne avant d'ajouter le contenu source
+                combinedContent.append("\n");
             }
 
-            // Ajouter le contenu source au contenu combiné
             combinedContent.append(sourceContent);
 
-            // Écrire le contenu combiné dans le fichier de destination
             Files.writeString(outputPath, combinedContent.toString());
         }
         else {
@@ -171,12 +164,10 @@ public class App {
         String todo = positionalArgs.get(1).trim();
         Path filePath = Paths.get(fileName);
 
-        // Déterminer le statut basé sur la présence de l'option --done
-        // Ici, doneStatus est "true" si --done est présent, sinon "false".
-        // Aucune modification n'est nécessaire si vous utilisez déjà cette logique.
+
 
         if (!Files.exists(filePath)) {
-            Files.createFile(filePath); // Crée le fichier vide
+            Files.createFile(filePath);
         }
 
         if (fileName.endsWith(".json")) {
@@ -189,7 +180,7 @@ public class App {
             arrayNode.add(todoNode);
             Files.writeString(filePath, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(arrayNode));
         } else if (fileName.endsWith(".csv")) {
-            String newLine = todo + ",,,," + doneStatus; // Utilisez le séparateur et ajoutez la tâche avec le statut défini
+            String newLine = todo + ",,,," + doneStatus;
             fileContent += fileContent.isEmpty() ? "" : "\n";
             fileContent += newLine;
             Files.writeString(filePath, fileContent);
@@ -210,18 +201,14 @@ public class App {
                 String task = node.get("task").asText();
                 String status = node.has("done") ? node.get("done").asText() : "";
 
-                // Aucune condition de filtrage pour 'false', il doit toujours être affiché
                 if (!filterDoneOnly || status.equals("true")) {
                     if (status.equals("true")) {
                         System.out.println("- Done: " + task);
                     } else if (status.equals("false")) {
-                        // Afficher la tâche sans préfixe pour le statut 'false'
                         System.out.println("- " + task);
                     } else if (!status.isEmpty()) {
-                        // Afficher le statut spécifique s'il n'est pas vide et différent de 'false'
                         System.out.println("- " + status + ": " + task);
                     } else {
-                        // Afficher juste la tâche si le statut est vide
                         System.out.println("- " + task);
                     }
                 }
@@ -233,25 +220,21 @@ public class App {
                         String task = parts[0];
                         String status = parts.length > 1 ? parts[1] : "";
 
-                        // Aucune condition de filtrage pour 'false', il doit toujours être affiché
                         if (!filterDoneOnly || status.equals("true")) {
                             if (status.equals("true")) {
                                 System.out.println("- Done: " + task);
                             } else if (status.equals("false")) {
-                                // S'assurer que la tâche n'est pas vide avant d'afficher
                                 if (!task.isEmpty()) {
                                     System.out.println("- " + task);
                                 }
                             } else if (!status.isEmpty()) {
-                                // S'assurer que la tâche n'est pas vide avant d'afficher
                                 if (!task.isEmpty()) {
                                     System.out.println("- " + status + ": " + task);
                                 }
                             } else {
-                                // Si le statut est vide, vérifiez également si la tâche n'est pas vide avant d'afficher
                                 if (!task.isEmpty()) {
                                     System.out.println("- " + task);
-                                } // Suppression du dernier else et remplacement par un return vide pour ne rien faire si task est vide
+                                }
                             }
                         }
                     });
